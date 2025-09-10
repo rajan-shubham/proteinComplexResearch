@@ -46,7 +46,7 @@ print(f"Number of alpha carbons: {len(coords)}")
 print(f"Number of pairs within {threshold}Å: {len(pairs)}")
 
 # Plot all alpha carbon positions
-fig = plt.figure(figsize=(12, 10))
+fig = plt.figure(figsize=(10, 9))
 ax = fig.add_subplot(111, projection='3d')
 
 x = coords[:, 0]
