@@ -119,3 +119,10 @@ print("Edge attr:", data.edge_attr.shape)
 print("first ca ca length:", data.edge_attr[0:10])
 print("Position tensor (pos):", data.pos.shape)
 print("Chains example:", chain_ids[300:310])
+
+"""
+print(res_names)
+print(unique)
+print(counts)
+print(freq_dict) 
+"""
