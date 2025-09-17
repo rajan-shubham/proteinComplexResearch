@@ -4,8 +4,8 @@ import torch
 from torch_geometric.data import Data
 
 parser = PDBParser()
-# structure = parser.get_structure("haemoglobin", "/Users/rajan/github/proteinComplex/sqlProtein/1a3n.pdb")
-structure = parser.get_structure("cellGrowthProtein", "/Users/rajan/github/proteinComplex/sqlProtein/P00533.pdb")
+structure = parser.get_structure("haemoglobin", "/Users/rajan/github/proteinComplex/sqlProtein/1a3n.pdb")
+# structure = parser.get_structure("cellGrowthProtein", "/Users/rajan/github/proteinComplex/sqlProtein/P00533.pdb")
 
 # Amino acid properties
 # One-hot encoding for 20 standard amino acids, plus a few properties
@@ -93,7 +93,20 @@ edge_index = torch.tensor(edge_index).t().contiguous()
 edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 
 # Create the graph object
-data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+coords = np.vstack([atom.coord for atom in ca_atoms])  # shape [n,3]
+chain_ids = [res.get_parent().id for res in residues]  # chain IDs
+
+data = Data(
+    x=x,
+    edge_index=edge_index,
+    edge_attr=edge_attr,
+    pos=torch.tensor(coords, dtype=torch.float),
+    y=torch.tensor([0]),  # placeholder label
+    name=structure.id,
+    chain_ids=chain_ids
+)
+
+
 print(data)
 print("Node features tensor (x):", data.x.shape)
 print(data.x)
@@ -101,6 +114,8 @@ print("Edge index tensor:", data.edge_index.shape)
 print(data.edge_index)
 print("Edge attributes tensor:", data.edge_attr.shape)
 print(data.edge_attr)
+print("Chains example:", chain_ids[300:310])
+
 
 """
 [-84.082  -7.267   5.658]
