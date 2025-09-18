@@ -96,6 +96,10 @@ edge_attr = torch.tensor(edge_attr, dtype=torch.float)
 coords = np.vstack([atom.coord for atom in ca_atoms])  # shape [n,3]
 chain_ids = [res.get_parent().id for res in residues]  # chain IDs
 
+unique_chains = list(set(chain_ids))
+
+print(unique_chains)
+
 data = Data(
     x=x,
     edge_index=edge_index,
