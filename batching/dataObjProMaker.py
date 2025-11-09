@@ -60,59 +60,102 @@ def fetch_pdb(uniprot_id):
 # PDB → Graph Data
 # -------------------------
 parser = PDBParser(QUIET=True)
-
 def pdb_to_data(pdb_path, label=0):
     structure = parser.get_structure(os.path.basename(pdb_path), pdb_path)
 
-    ca_atoms, residues, chain_ids = [], [], []
-    for model in structure:
-        for chain in model:
-            for residue in chain:
-                if "CA" in residue:
-                    ca_atoms.append(residue["CA"])
-                    residues.append(residue)
-                    chain_ids.append(chain.id)
+    AMINO_ACID_PROPERTIES = {
+    'ALA': {'hydrophobicity': 1.8, 'mw': 89.09},
+    'ARG': {'hydrophobicity': -4.5, 'mw': 174.20},
+    'ASN': {'hydrophobicity': -3.5, 'mw': 132.12},
+    'ASP': {'hydrophobicity': -3.5, 'mw': 133.10},
+    'CYS': {'hydrophobicity': 2.5, 'mw': 121.16},
+    'GLN': {'hydrophobicity': -3.5, 'mw': 146.15},
+    'GLU': {'hydrophobicity': -3.5, 'mw': 147.13},
+    'GLY': {'hydrophobicity': -0.4, 'mw': 75.07},
+    'HIS': {'hydrophobicity': -3.2, 'mw': 155.16},
+    'ILE': {'hydrophobicity': 4.5, 'mw': 131.18},
+    'LEU': {'hydrophobicity': 3.8, 'mw': 131.18},
+    'LYS': {'hydrophobicity': -3.9, 'mw': 146.19},
+    'MET': {'hydrophobicity': 1.9, 'mw': 149.21},
+    'PHE': {'hydrophobicity': 2.8, 'mw': 165.19},
+    'PRO': {'hydrophobicity': -1.6, 'mw': 115.13},
+    'SER': {'hydrophobicity': -0.8, 'mw': 105.09},
+    'THR': {'hydrophobicity': -0.7, 'mw': 119.12},
+    'TRP': {'hydrophobicity': -0.9, 'mw': 204.23},
+    'TYR': {'hydrophobicity': -1.3, 'mw': 181.19},
+    'VAL': {'hydrophobicity': 4.2, 'mw': 117.15},
+    'HOH': {'hydrophobicity': -0.4, 'mw': 18.02}, # Water
+    '': {'hydrophobicity': 0, 'mw': 0}, # For unknown residues
+      }
+    AMINO_ACID_TYPES = list(AMINO_ACID_PROPERTIES.keys())
+    NUM_FEATURES = len(AMINO_ACID_TYPES) + 2  # One-hot encoding (21) + 2 properties
+
+
+    ca_atoms = []
+    residues = []
+    for residue in structure.get_residues():
+        if "CA" in residue:
+            ca_atoms.append(residue["CA"])
+            residues.append(residue)
 
     n = len(ca_atoms)
-    if n == 0:
-        return None
+    dist_matrix = np.zeros((n, n))
 
-    coords = np.vstack([atom.coord for atom in ca_atoms])
+    for i in range(n):
+        for j in range(i+1, n):
+            dist = np.linalg.norm(ca_atoms[i].coord - ca_atoms[j].coord)
+            dist_matrix[i, j] = dist
+            dist_matrix[j, i] = dist
 
-    # residue names + frequency
-    res_names = [res.get_resname() if res.get_resname() in AMINO_ACID_PROPERTIES else 'UNK'
-                 for res in residues]
-    unique, counts = np.unique(res_names, return_counts=True)
-    freq_dict = {u: c / n for u, c in zip(unique, counts)}
-
-    # node features
+    # Create node features
     node_features = []
-    for res_name in res_names:
-        props = AMINO_ACID_PROPERTIES.get(res_name, AMINO_ACID_PROPERTIES['UNK'])
-        features = torch.tensor([freq_dict.get(res_name, 0.0),
-                                 props['hydrophobicity'],
-                                 props['mw']], dtype=torch.float)
+    for residue in residues:
+        res_name = residue.get_resname()
+        
+        # One-hot encode the amino acid type
+        one_hot = torch.zeros(len(AMINO_ACID_TYPES))
+        try:
+            idx = AMINO_ACID_TYPES.index(res_name)
+            one_hot[idx] = 1
+        except ValueError:
+            pass # Keep all zeros for unknown residues
+            
+        # Get numerical properties
+        props = AMINO_ACID_PROPERTIES.get(res_name, AMINO_ACID_PROPERTIES[''])
+        hydrophobicity = props['hydrophobicity']
+        mw = props['mw']
+        
+        # Combine all features into a single tensor
+        features = torch.cat((one_hot, torch.tensor([hydrophobicity, mw], dtype=torch.float)))
         node_features.append(features)
+
     x = torch.stack(node_features)
 
-    # edges
-    kdtree = cKDTree(coords)
-    pairs = kdtree.query_pairs(r=5.0)
-    edge_index, edge_attr = [], []
-    for i, j in pairs:
-        dist = np.linalg.norm(coords[i] - coords[j])
-        edge_index.extend([[i, j], [j, i]])
-        edge_attr.extend([[dist], [dist]])
+    # Create edge index and edge attributes based on distance matrix
+    threshold = 5.0
+    edge_index = []
+    edge_attr = []
 
-    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+    for i in range(n):
+        for j in range(n):
+            if i != j and dist_matrix[i, j] < threshold:
+                edge_index.append([i, j])
+                edge_attr.append([dist_matrix[i, j]])
+
+    edge_index = torch.tensor(edge_index).t().contiguous()
     edge_attr = torch.tensor(edge_attr, dtype=torch.float)
+
+    # Create the graph object
+    coords = np.vstack([atom.coord for atom in ca_atoms])  # shape [n,3]
+    chain_ids = [res.get_parent().id for res in residues]  # chain IDs
+
 
     return Data(
         x=x,
         edge_index=edge_index,
         edge_attr=edge_attr,
         pos=torch.tensor(coords, dtype=torch.float),
-        y=torch.tensor([label]),
+        y=torch.tensor([0]),  # placeholder label
         name=structure.id,
         chain_ids=chain_ids
     )
