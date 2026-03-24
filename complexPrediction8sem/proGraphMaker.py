@@ -212,3 +212,70 @@ if __name__ == "__main__":
     print(f"⚠️ Missing PDB files for {len(failed_proteins)} proteins")
 
     print("Missing proteins saved → missing_pdb_proteins.json")
+
+"""
+import os
+import json
+import pickle
+import glob
+
+# ---------------------------------------------------------
+# Main pipeline: Process Local Files into One Single .pkl
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    # 1. Setup Paths
+    pdb_folder = "my_pdbs"  # Your folder with .pdb files
+    master_list_path = "complexPrediction8sem/missing_pdb_proteins.json"
+    output_pkl_path = "complexPrediction8sem/protein_graphsNew.pkl"
+    missing_json_path = "complexPrediction8sem/missing_pdb_proteinsGraphs.json"
+
+    # 2. Load your original list of 106 IDs
+    with open(master_list_path, "r") as f:
+        all_uniprot_ids = json.load(f)
+
+    datalist = []        # This will hold your Data objects
+    failed_proteins = [] # This will hold the IDs that couldn't be processed
+    
+    print(f"🚀 Starting graph construction for {len(all_uniprot_ids)} proteins...")
+
+    # 3. Process each UniProt ID
+    for uid in all_uniprot_ids:
+        # Search for any file in the folder that contains the UniProt ID
+        search_pattern = os.path.join(pdb_folder, f"*{uid}*.pdb")
+        matching_files = glob.glob(search_pattern)
+
+        if matching_files:
+            pdb_path = matching_files[0] # Use the first match found
+            
+            try:
+                # Call your specific function to convert PDB to Data object
+                data = pdb_to_data(pdb_path, label=0)
+
+                if data:
+                    datalist.append(data)
+                    print(f"✅ Processed: {uid}")
+                else:
+                    print(f"⚠️ pdb_to_data returned None for: {uid}")
+                    failed_proteins.append(uid)
+
+            except Exception as e:
+                print(f"🔥 Error processing {uid}: {e}")
+                failed_proteins.append(uid)
+        else:
+            # File wasn't in the folder
+            print(f"❌ File not found for: {uid}")
+            failed_proteins.append(uid)
+
+    # 4. Save everything into ONE single .pkl file
+    with open(output_pkl_path, "wb") as f:
+        pickle.dump(datalist, f)
+
+    # 5. Save the list of IDs that are still missing or failed
+    with open(missing_json_path, "w") as f:
+        json.dump(failed_proteins, f, indent=4)
+
+    print("\n" + "="*30)
+    print(f"📦 FINAL SUCCESS: {len(datalist)} graphs saved to {output_pkl_path}")
+    print(f"❌ FAILED/MISSING: {len(failed_proteins)} IDs saved to {missing_json_path}")
+    print("="*30)
+"""

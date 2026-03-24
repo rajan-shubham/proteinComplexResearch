@@ -96,11 +96,11 @@ for up_id in missing_ids:
         pdb_response = requests.get(download_url)
         
         if pdb_response.status_code == 200:
-            with open(f"{output_dir}/{up_id}_{pdb_id}.pdb", "w") as f:
+            with open(f"{output_dir}/{up_id}.pdb", "w") as f:
                 f.write(pdb_response.text)
             print(f"  ✅ Saved as {up_id}_{pdb_id}.pdb")
         else:
-            print(f"  ❌ Failed to download .pdb for {pdb_id} (Large structures may only be .cif)")
+            print(f"  ❌ Failed to download .pdb for {up_id} --> {pdb_id} (Large structures may only be .cif)")
     else:
         print(f"  ❌ No experimental structure found in RCSB for {up_id}")
     
