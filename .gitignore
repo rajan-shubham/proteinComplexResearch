@@ -54,3 +54,5 @@ Icon?
 *.pickle
 *.h5
 *.pkl
+*.json
+*.csv
